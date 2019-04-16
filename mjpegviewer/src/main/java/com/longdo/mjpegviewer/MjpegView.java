@@ -11,6 +11,7 @@ import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
+import android.util.Base64;
 
 import java.io.BufferedInputStream;
 import java.net.HttpURLConnection;
@@ -43,6 +44,8 @@ public class MjpegView extends View{
     private Rect dst;
 
     private int mode = MODE_ORIGINAL;
+    private String username;
+    private String password;
     private int drawX,drawY, vWidth = -1, vHeight = -1;
     private int lastImgWidth, lastImgHeight;
 
@@ -120,6 +123,14 @@ public class MjpegView extends View{
         else{
             Log.e(tag,"Can not request Canvas's redraw. Context is not an instance of Activity");
         }
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 
     @Override
@@ -315,10 +326,23 @@ public class MjpegView extends View{
                 URL serverUrl = null;
 
                 try {
+                    String authorization = "";
                     serverUrl = new URL(url);
 
                     connection = (HttpURLConnection) serverUrl.openConnection();
                     connection.setDoInput(true);
+
+                    if (username != null && password != null) {
+                        authorization = username + ":" + password;
+                    }
+            
+                    if (authorization != null) {
+                        String encodedBytes = "";
+                        encodedBytes = Base64.encodeToString(authorization.getBytes(), Base64.NO_WRAP);
+                        authorization = "Basic " + encodedBytes;
+                        connection.setRequestProperty("Authorization", authorization);
+                    }
+
                     connection.connect();
 
                     String headerBoundary = "[_a-zA-Z0-9]*boundary"; // Default boundary pattern
