@@ -38,6 +38,7 @@ public class MjpegView extends View{
     private String url;
     private Bitmap lastBitmap;
     private MjpegDownloader downloader;
+    private OnLoadCallbacks callbacks;
     private final Object lockBitmap = new Object();
 
     private Paint paint;
@@ -48,6 +49,8 @@ public class MjpegView extends View{
     private String password;
     private int drawX,drawY, vWidth = -1, vHeight = -1;
     private int lastImgWidth, lastImgHeight;
+    private int framecounter;
+    private boolean streamCancelling = false;
 
     private boolean adjustWidth, adjustHeight;
 
@@ -78,6 +81,8 @@ public class MjpegView extends View{
     }
 
     public void startStream(){
+        streamCancelling = false;
+
         if(downloader != null && downloader.isRunning()){
             Log.w(tag,"Already started, stop by calling stopStream() first.");
             return;
@@ -88,6 +93,8 @@ public class MjpegView extends View{
     }
 
     public void stopStream(){
+        streamCancelling = true;
+
         downloader.cancel();
     }
 
@@ -101,6 +108,10 @@ public class MjpegView extends View{
 
     public void setBitmap(Bitmap bm){
         Log.v(tag,"New frame");
+
+        if (callbacks != null) {
+            callbacks.onLoadOkCallback();
+        }
 
         synchronized (lockBitmap) {
             if (lastBitmap != null && ((isUserForceConfigRecycle && isRecycleBitmap) || (!isUserForceConfigRecycle && Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB))) {
@@ -131,6 +142,10 @@ public class MjpegView extends View{
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public void setCallbacks(OnLoadCallbacks callbacks) {
+        this.callbacks = callbacks;
     }
 
     @Override
@@ -348,6 +363,12 @@ public class MjpegView extends View{
                     String headerBoundary = "[_a-zA-Z0-9]*boundary"; // Default boundary pattern
 
                     try{
+                        int responseCode = connection.getResponseCode();
+
+                        if (responseCode != 200) {
+                            callbacks.onHttpErrorCallback(responseCode);
+                        }
+
                         // Try to extract a boundary from HTTP header first.
                         // If the information is not presented, throw an exception and use default value instead.
                         String contentType = connection.getHeaderField("Content-Type");
@@ -418,6 +439,8 @@ public class MjpegView extends View{
                                 Bitmap outputImg = BitmapFactory.decodeByteArray(image, 0, image.length);
                                 if (outputImg != null) {
                                     if(run) {
+                                        framecounter += 1;
+
                                         newFrame(outputImg);
                                     }
                                 } else {
@@ -448,6 +471,9 @@ public class MjpegView extends View{
                     bis.close();
                     connection.disconnect();
                     Log.i(tag,"disconnected with " + url);
+                    if (callbacks != null && framecounter != 0 && streamCancelling != true) {
+                        callbacks.onLoadErrorCallback();
+                    }
                 } catch (Exception e) {
                     if(e != null && e.getMessage() != null) {
                         Log.e(tag, e.getMessage());
@@ -482,5 +508,15 @@ public class MjpegView extends View{
         private void newFrame(Bitmap bitmap){
             setBitmap(bitmap);
         }
+    }
+
+    //
+    // INNER CLASS
+    //
+
+    public interface OnLoadCallbacks {
+        void onLoadErrorCallback();
+        void onLoadOkCallback();
+        void onHttpErrorCallback(int httpCode);
     }
 }
