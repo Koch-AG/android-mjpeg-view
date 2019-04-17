@@ -365,7 +365,7 @@ public class MjpegView extends View{
                     try{
                         int responseCode = connection.getResponseCode();
 
-                        if (responseCode != 200) {
+                        if(responseCode >= 400 && responseCode <= 500) {
                             callbacks.onHttpErrorCallback(responseCode);
                         }
 
