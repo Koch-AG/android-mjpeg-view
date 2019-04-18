@@ -93,6 +93,11 @@ public class MjpegView extends View{
     }
 
     public void stopStream(){
+        if(downloader == null){
+            Log.w(tag,"Already stopped, start by calling startStream() first.");
+            return;
+        }
+
         streamCancelling = true;
 
         downloader.cancel();
